@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.special as sp
+import tensorflow as tf
 
 gl_nodes = {
     2: [-0.5773502691896257645092, 0.5773502691896257645092],
@@ -73,6 +74,7 @@ class IRK:
         # build RK coefficient matrix
         self.rk_matrix = None
         self.build_matrix()
+        self.rk_matrix_tf32 = tf.convert_to_tensor(self.rk_matrix.T, dtype=tf.float32)
 
     def get_nodes(self):
         nodes = gl_nodes.get(self.order, "nothing")
@@ -83,12 +85,15 @@ class IRK:
         return weights
 
     def build_matrix(self):
-        # self.rk_matrix = np.zeros((self.order, self.order))
-        self.rk_matrix = np.array([[0.5 * self.weights[i] * sum(self.series(s, i, j) for s in range(self.order))
+        self.rk_matrix = np.zeros((self.order + 1, self.order + 1))
+        self.rk_matrix[:-1, :-1] = np.array([[0.5 * self.weights[i] * sum(self.series(s, i, j)
+                                                                          for s in range(self.order))
                                     + self.weights[i] / 2.0
                                     for i in range(self.order)]
                                    for j in range(self.order)])
-        print(self.rk_matrix)
+        self.rk_matrix[-1, :-1] = 0.5 * np.array(self.weights)
+        # self.rk_matrix[:-1, -1] = self.weights
+        # print(self.rk_matrix)
 
     def series(self, s, i, j):
         return 0.5 * sp.eval_legendre(s, self.nodes[i]) * (sp.eval_legendre(s + 1, self.nodes[j])

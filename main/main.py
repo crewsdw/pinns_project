@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorflow.keras as keras
 import x_grid as grid
+import newton as newton
 
 keras.backend.clear_session()
 
@@ -19,11 +20,45 @@ def solution_periodic(x, t, a):
 
 
 # Initialize IRK coefficient matrix...
-order = 10  # 4
+order = 10
 nodes = 32
 IRK = irk.IRK(order=order)
 IRK.build_matrix()
 
+# Lorenz with IRK:
+q = np.array([10.54, 4.112, 35.82])
+# q = np.array([10.5, 4.0, 30.0])
+dt = 0.5
+
+nt = 10
+
+qs = np.zeros((3, order+1, nt))
+for i in range(order+1):
+    qs[:, i, 0] = q
+
+for i in range(1, nt):
+    k_vec = newton.newton_irk(q, dt, irk=IRK, threshold=1.0e-10, max_iterations=100)
+    # print(IRK.weights.shape)
+    # print(IRK.rk_matrix.shape)
+    # print(k_vec.shape)
+    # print(q.shape)
+    # GL stages
+    qs[:, :-1, i] = q[:, None] + dt * np.transpose(np.tensordot(IRK.rk_matrix, k_vec, axes=([0], [0])), axes=([1, 0]))
+    # Update
+    q += 0.5 * dt * np.tensordot(IRK.weights, k_vec, axes=([0], [0]))  # 0.5 * dt * (k1 + k2)
+    qs[:, -1, i] = q
+
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+ax.scatter(qs[0, :, :].flatten(), qs[1, :, :].flatten(), qs[2, :, :].flatten())
+# for i in range(nt):
+#     ax.plot(qs[0, :, i], qs[1, :, i], qs[2, :, i], 'o--')
+# print(qs)
+plt.show()
+print('show plz')
+quit()
+
+# Advection-Diffusion with net:
 # Net parameters
 dt = 0.05
 alpha = 1.0

@@ -68,13 +68,14 @@ gl_weights = {
 class IRK:
     def __init__(self, order):
         self.order = int(order)
-        self.nodes = self.get_nodes()
-        self.weights = self.get_weights()
+        self.nodes = np.array(self.get_nodes())
+        self.weights = np.array(self.get_weights())
 
         # build RK coefficient matrix
         self.rk_matrix = None
+        self.rk_matrix_quads = None
         self.build_matrix()
-        self.rk_matrix_tf32 = tf.convert_to_tensor(self.rk_matrix.T, dtype=tf.float32)
+        self.rk_matrix_tf32 = tf.convert_to_tensor(self.rk_matrix_quads.T, dtype=tf.float32)
 
     def get_nodes(self):
         nodes = gl_nodes.get(self.order, "nothing")
@@ -85,13 +86,14 @@ class IRK:
         return weights
 
     def build_matrix(self):
-        self.rk_matrix = np.zeros((self.order + 1, self.order + 1))
-        self.rk_matrix[:-1, :-1] = np.array([[0.5 * self.weights[i] * sum(self.series(s, i, j)
-                                                                          for s in range(self.order))
-                                    + self.weights[i] / 2.0
-                                    for i in range(self.order)]
-                                   for j in range(self.order)])
-        self.rk_matrix[-1, :-1] = 0.5 * np.array(self.weights)
+        self.rk_matrix_quads = np.zeros((self.order + 1, self.order + 1))
+        self.rk_matrix_quads[:-1, :-1] = np.array([[0.5 * self.weights[i] * sum(self.series(s, i, j)
+                                                                                for s in range(self.order))
+                                                    + self.weights[i] / 2.0
+                                                    for i in range(self.order)]
+                                                   for j in range(self.order)])
+        self.rk_matrix = self.rk_matrix_quads[:-1, :-1]
+        self.rk_matrix_quads[-1, :-1] = 0.5 * np.array(self.weights)
         # self.rk_matrix[:-1, -1] = self.weights
         # print(self.rk_matrix)
 

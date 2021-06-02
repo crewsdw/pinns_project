@@ -20,37 +20,91 @@ def solution_periodic(x, t, a):
 
 
 # Initialize IRK coefficient matrix...
-order = 10
+order = 100  # 50  # 10
 nodes = 32
 IRK = irk.IRK(order=order)
 IRK.build_matrix()
 
-# Lorenz with IRK:
-q = np.array([10.54, 4.112, 35.82])
-# q = np.array([10.5, 4.0, 30.0])
-dt = 0.5
+dt = 0.8
+# Net parameters
+alpha = 1.0
+parameters = [dt, alpha]
+# neurons = nodes
+activation = 'elu'  # 'tanh'
+optimizer = 'adam'
+epochs = 12000
 
-nt = 10
+# Main net loop for Lorenz system
+steps = 5
+q = np.array([10.54, -4.112, 35.82])
+# q = np.array([1.0, -1.0, -1.0])
+q_loop = np.zeros((3, order+1, steps))
+for idx in range(steps):
+    # Lorenz with IRK:
 
-qs = np.zeros((3, order+1, nt))
-for i in range(order+1):
-    qs[:, i, 0] = q
+    # q1 = np.array([8, 3, 20])
+    # q2 = np.array([6, 2, 10])
+    # q = np.array([10.5, 4.0, 30.0])
+    # dt = 0.1
 
-for i in range(1, nt):
-    k_vec = newton.newton_irk(q, dt, irk=IRK, threshold=1.0e-10, max_iterations=100)
-    # print(IRK.weights.shape)
-    # print(IRK.rk_matrix.shape)
-    # print(k_vec.shape)
-    # print(q.shape)
-    # GL stages
-    qs[:, :-1, i] = q[:, None] + dt * np.transpose(np.tensordot(IRK.rk_matrix, k_vec, axes=([0], [0])), axes=([1, 0]))
-    # Update
-    q += 0.5 * dt * np.tensordot(IRK.weights, k_vec, axes=([0], [0]))  # 0.5 * dt * (k1 + k2)
-    qs[:, -1, i] = q
+    u0 = np.array([q])  # , q1, q2])
+
+    # Make neural net
+    # xtf = tf.reshape(tf.convert_to_tensor(x0), (nodes, 1))
+    utf = tf.reshape(tf.convert_to_tensor(u0), (u0.shape[0], u0.shape[1]))
+    net = nn.NeuralNet_LorenzStepper(parameters=parameters, irk=IRK, neurons=q.shape[0], activation=activation)
+    net.compile(optimizer=optimizer, loss=net.loss)
+
+    # Fit model
+    net.fit(utf, utf, epochs=epochs, shuffle=True)  # , callbacks=[early_stop])  # , batch_size=nodes)
+
+    out = net.predict(utf)  # , batch_size=nodes)
+
+    sigma = 10
+    beta = 8 / 3
+    rho = 28
+    rhs = tf.convert_to_tensor([sigma * (out[:, 1, :] - out[:, 0, :]),
+                            out[:, 0, :] * (rho - out[:, 2, :]) - out[:, 1, :],
+                            out[:, 0, :] * out[:, 1, :] - beta * out[:, 2, :]])
+    u0_out = np.asarray(out - dt * tf.transpose(tf.matmul(rhs, IRK.rk_matrix_tf32), perm=(1, 0, 2)))
+    # print(out.shape)
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    # ax.scatter(u0_out[:, 0, :].flatten(), u0_out[:, 1, :].flatten(), u0_out[:, 2, :].flatten(), label='predicted u0')
+    # ax.scatter(u0[:, 0], u0[:, 1], u0[:, 2])
+    # ax.scatter(out[:, 0, :].flatten(), out[:, 1, :].flatten(), out[:, 2, :].flatten(), label='predicted rk stages')
+    # plt.show()
+
+    # Use output as guess for Newton solver
+
+    nt = 2
+
+    qs = np.zeros((3, order+1, nt))
+    for i in range(order+1):
+        qs[:, i, 0] = q
+
+    for i in range(1, nt):
+        # Newton iteration for rhs evaluations
+        k_vec = newton.newton_irk(q, guess=out[0, :, :], dt=dt, irk=IRK, threshold=1.0e-10, max_iterations=300)
+        # GL stages
+        print(k_vec.shape)
+        print(IRK.rk_matrix.shape)
+        qs[:, :-1, i] = q[:, None] + dt * np.transpose(np.tensordot(IRK.rk_matrix, k_vec, axes=([1], [0])), axes=([1, 0]))
+        # Update
+        q += 0.5 * dt * np.tensordot(IRK.weights, k_vec, axes=([0], [0]))  # 0.5 * dt * (k1 + k2)
+        qs[:, -1, i] = q
+
+    q_loop[:, :, idx] = qs[:, :, -1]
 
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
-ax.scatter(qs[0, :, :].flatten(), qs[1, :, :].flatten(), qs[2, :, :].flatten())
+ax.set_title('Lorenz system implicit RK advance, dt=%.3e' % dt + ', err threshold 1.0e-10')
+for i in range(steps):
+    ax.scatter(q_loop[0, :, i], q_loop[1, :, i], q_loop[0, :, i], label='stages of time-step ' + str(i))
+# ax.scatter(out[:, 0, :].flatten(), out[:, 1, :].flatten(), out[:, 2, :].flatten(), label='predicted rk stages')
+# ax.scatter(qs[0, :, :].flatten(), qs[1, :, :].flatten(), qs[2, :, :].flatten(), label='newton iterated rk stages')
+# plt.legend(loc='best')
 # for i in range(nt):
 #     ax.plot(qs[0, :, i], qs[1, :, i], qs[2, :, i], 'o--')
 # print(qs)
@@ -92,8 +146,8 @@ boundary = np.array([lb, rb])
 # Make neural net
 xtf = tf.reshape(tf.convert_to_tensor(x0), (nodes, 1))
 utf = tf.reshape(tf.convert_to_tensor(u0), (nodes, 1))
-net = nn.NeuralNet(x=x0, u=u0, bc=boundary, parameters=parameters,
-                   irk=IRK, neurons=nodes, activation=activation)
+net = nn.NeuralNet_AdvectionDiffusion(x=x0, u=u0, bc=boundary, parameters=parameters,
+                                      irk=IRK, neurons=nodes, activation=activation)
 net.compile(optimizer=optimizer, loss=net.loss_with_bc)  # loss=tf.keras.losses.MeanSquaredError())
 # net.loss_with_bc)  # loss=tf.keras.losses.MeanSquaredError())
 

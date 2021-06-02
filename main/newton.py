@@ -5,7 +5,8 @@ import numpy.linalg as linalg
 # For lorenz system
 def lorenz_dynamics(q):
     x, y, z = q[:, 0], q[:, 1], q[:, 2]
-
+    # print(q.shape)
+    # quit()
     sigma = 10
     beta = 8 / 3
     rho = 28
@@ -19,6 +20,8 @@ def lorenz_dynamics(q):
     f_rhs = np.array([[sigma * (y[i] - x[i]),
                       x[i] * (rho - z[i]) - y[i],
                       x[i] * y[i] - beta * z[i]] for i in range(q.shape[0])])
+    # print(f_rhs.shape)
+    # quit()
 
     jacobian = np.array([[[-sigma, sigma, 0],
                          [rho, 1.0, -x[i]],
@@ -28,16 +31,19 @@ def lorenz_dynamics(q):
 
 
 # IRK update
-def newton_irk(q, dt, irk, threshold, max_iterations):
+def newton_irk(q, guess, dt, irk, threshold, max_iterations):
     # Use an explicit Euler step as initial guess
-    rhs, _ = lorenz_dynamics(q[None, :])
-    rhs = rhs[0, :]
+    # rhs, _ = lorenz_dynamics(q[None, :])
+    # rhs = rhs[0, :]
 
     # position guess: explicit step
     # q1 = q + 0.5 * (1.0 - 1.0 / np.sqrt(3.0)) * dt * rhs
     # q2 = q + 0.5 * (1.0 + 1.0 / np.sqrt(3.0)) * dt * rhs
-    q_guess = q + 0.5 * dt * np.tensordot((irk.nodes + 1.0)/2.0, rhs, axes=0)
-
+    # print(guess.shape)
+    # guess = q + dt * np.tensordot((irk.nodes + 1.0)/2.0, rhs, axes=0)
+    # print(guess.shape)
+    # quit()
+    guess = guess[:, :-1].transpose()
     # print(q_guess.shape)
     # IRK matrix
     # a11, a12 = 0.25, 0.25 - np.sqrt(3.0) / 6.0
@@ -45,7 +51,7 @@ def newton_irk(q, dt, irk, threshold, max_iterations):
     # a_mtx = irk.rk_matrix
 
     # Iterate of stages
-    k_vec, j_vec = lorenz_dynamics(q_guess)
+    k_vec, j_vec = lorenz_dynamics(guess)
     # print(k_vec.shape)
     # quit()
 
@@ -89,7 +95,8 @@ def newton_irk(q, dt, irk, threshold, max_iterations):
         # print(k_vec.shape)
         # quit()
         # Get iterate k's
-        k_vec -= solution
+        damping = 0.25
+        k_vec -= damping * solution
         # k1 = k1 - solution[0, :]
         # k2 = k2 - solution[1, :]
 
@@ -100,6 +107,7 @@ def newton_irk(q, dt, irk, threshold, max_iterations):
         itr += 1
 
         if itr >= max_iterations:
+            print('Did not converge by iterations!')
             return k_vec
 
     print('Newton iteration took ' + str(itr) + ' tries, with error %.3e' % error)

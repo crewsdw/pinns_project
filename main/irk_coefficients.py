@@ -243,9 +243,7 @@ class IRK:
                                                     for i in range(self.order)]
                                                    for j in range(self.order)])
         self.rk_matrix = self.rk_matrix_quads[:-1, :-1]
-        self.rk_matrix_quads[-1, :-1] = 0.5 * np.array(self.weights)
-        # self.rk_matrix[:-1, -1] = self.weights
-        # print(self.rk_matrix)
+        self.rk_matrix_quads[:-1, -1] = 0.5 * np.array(self.weights)
 
     def series(self, s, i, j):
         return 0.5 * sp.eval_legendre(s, self.nodes[i]) * (sp.eval_legendre(s + 1, self.nodes[j])

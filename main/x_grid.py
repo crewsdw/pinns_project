@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.special as sp
-import tensorflow as tf
 
 # Legendre-Gauss-Lobatto nodes and quadrature weights dictionaries
 lgl_nodes = {
@@ -104,8 +103,6 @@ class GridX:
         # Legendre-Lobatto "eigenvalues"
         eigenvalues = np.array([(2.0 * s + 1) / 2.0 for s in range(self.order - 1)])
 
-        # if self.order == 1:
-        #    eigenvalues = 1 / 2
         return np.append(eigenvalues, (self.order - 1) / 2.0)
 
     def set_vandermonde_inverse(self):

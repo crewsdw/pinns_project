@@ -107,7 +107,7 @@ class NeuralNet_LorenzStepper(tf.keras.Model):
 
     # Loss function
     @tf.autograph.experimental.do_not_convert
-    def loss(self, u0_true, u1):
+    def custom_loss(self, u0_true, u1):
         # Compute Lorenz system RHS
         rhs = tf.convert_to_tensor([self.sigma * (u1[:, 1, :] - u1[:, 0, :]),
                                     u1[:, 0, :] * (self.rho - u1[:, 2, :]) - u1[:, 1, :],

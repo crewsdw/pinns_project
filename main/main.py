@@ -37,7 +37,8 @@ for idx in range(steps):
     # Make neural net
     utf = tf.reshape(tf.convert_to_tensor(u0), (u0.shape[0], u0.shape[1]))
     net = nn.NeuralNet_LorenzStepper(parameters=parameters, irk=IRK, neurons=q.shape[0], activation=activation)
-    net.compile(optimizer=optimizer, loss=net.loss)
+    loss_fn = net.custom_loss
+    net.compile(optimizer=optimizer, loss=lambda y_true, y_pred: loss_fn(y_true, y_pred))
 
     # Fit model
     net.fit(utf, utf, epochs=epochs, shuffle=True)  # , callbacks=[early_stop])  # , batch_size=nodes)
@@ -93,8 +94,6 @@ print('show plz')
 quit()
 
 # Part Two: Advection-Diffusion with net:
-
-
 def solution_dirichlet(x, t, a):
     # Problem to solve... first mode of dirichlet linear advection-diffusion
     return np.exp(a * 0.5 * (x - a * 0.5 * t)) * np.sin(np.pi * x) * np.exp(-(np.pi ** 2.0) * t)
@@ -140,7 +139,8 @@ xtf = tf.reshape(tf.convert_to_tensor(x0), (nodes, 1))
 utf = tf.reshape(tf.convert_to_tensor(u0), (nodes, 1))
 net = nn.NeuralNet_AdvectionDiffusion(x=x0, u=u0, bc=boundary, parameters=parameters,
                                       irk=IRK, neurons=nodes, activation=activation)
-net.compile(optimizer=optimizer, loss=net.loss_with_bc)
+loss_fn_ad = net.loss_with_bc
+net.compile(optimizer=optimizer, loss=lambda y_true, y_pred: loss_fn_ad(y_true, y_pred))
 
 # Fit model
 net.fit(xtf, utf, epochs=epochs, shuffle=True)

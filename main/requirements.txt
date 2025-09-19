@@ -3,5 +3,5 @@ scipy
 tensorflow
 matplotlib
 pytest
-black 
+black
 isort

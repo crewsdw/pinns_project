@@ -10,13 +10,23 @@ def lorenz_dynamics(q):
     beta = 8.0 / 3.0
     rho = 28.0
 
-    f_rhs = np.array([[sigma * (y[i] - x[i]),
-                      x[i] * (rho - z[i]) - y[i],
-                      x[i] * y[i] - beta * z[i]] for i in range(q.shape[0])])
+    f_rhs = np.array(
+        [
+            [
+                sigma * (y[i] - x[i]),
+                x[i] * (rho - z[i]) - y[i],
+                x[i] * y[i] - beta * z[i],
+            ]
+            for i in range(q.shape[0])
+        ]
+    )
 
-    jacobian = np.array([[[-sigma, sigma, 0],
-                         [rho, 1.0, -x[i]],
-                         [y[i], x[i], -beta]] for i in range(q.shape[0])])
+    jacobian = np.array(
+        [
+            [[-sigma, sigma, 0], [rho, 1.0, -x[i]], [y[i], x[i], -beta]]
+            for i in range(q.shape[0])
+        ]
+    )
 
     return f_rhs, jacobian
 
@@ -35,7 +45,9 @@ def newton_irk(q, dt, irk, threshold, max_iterations, guess):
     k_vec, j_vec = lorenz_dynamics(guess)
 
     def err(rhs_in):
-        rhs_vec, _ = lorenz_dynamics(q + dt * np.matmul(irk.rk_matrix, rhs_in))  # (a11 * k1 + a12 * k2))
+        rhs_vec, _ = lorenz_dynamics(
+            q + dt * np.matmul(irk.rk_matrix, rhs_in)
+        )  # (a11 * k1 + a12 * k2))
         error_vec = rhs_in - rhs_vec
         return error_vec
 
@@ -47,10 +59,13 @@ def newton_irk(q, dt, irk, threshold, max_iterations, guess):
     error = err_norm(err(k_vec))
     while error > threshold and itr < max_iterations:
         # Iterate of stages
-        _, j_vec = lorenz_dynamics(q + dt * np.matmul(irk.rk_matrix, k_vec))  # (a11 * k1 + a12 * k2))
+        _, j_vec = lorenz_dynamics(
+            q + dt * np.matmul(irk.rk_matrix, k_vec)
+        )  # (a11 * k1 + a12 * k2))
         # Jacobian of IRK method, I - dt * A * J with J jacobian of original system
-        jac = (np.tensordot(np.eye(irk.order), np.eye(q.shape[0]), axes=0) -
-               dt * np.einsum('ij,ikl->ijkl', irk.rk_matrix, j_vec))
+        jac = np.tensordot(
+            np.eye(irk.order), np.eye(q.shape[0]), axes=0
+        ) - dt * np.einsum("ij,ikl->ijkl", irk.rk_matrix, j_vec)
 
         # Reshape to a single square system
         err_m = err(k_vec)
@@ -70,8 +85,8 @@ def newton_irk(q, dt, irk, threshold, max_iterations, guess):
         itr += 1
 
         if itr >= max_iterations:
-            print('Did not converge by iterations!')
+            print("Did not converge by iterations!")
             return k_vec
 
-    print('Newton iteration took ' + str(itr) + ' tries, with error %.3e' % error)
+    print("Newton iteration took " + str(itr) + " tries, with error %.3e" % error)
     return k_vec

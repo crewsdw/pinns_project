@@ -1,11 +1,11 @@
-import numpy as np
 import irk_coefficients as irk
-import neural_net as nn
 import matplotlib.pyplot as plt
+import neural_net as nn
+import newton as newton
+import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 import x_grid as grid
-import newton as newton
 
 keras.backend.clear_session()
 
@@ -21,26 +21,33 @@ dt = 0.8
 alpha = 1.0
 parameters = [dt, alpha]
 # neurons = nodes
-activation = 'elu'  # 'tanh'
-optimizer = 'adam'
+activation = "elu"  # 'tanh'
+optimizer = "adam"
 epochs = 12000
 
 # Main net loop for Lorenz system
 steps = 20
 q = np.array([10.54, 4.112, 35.82])
 # q = np.array([1.0, -1.0, -1.0])
-q_loop = np.zeros((3, order+1, steps))
+q_loop = np.zeros((3, order + 1, steps))
 for idx in range(steps):
     # Lorenz with IRK:
     u0 = np.array([q])  # , q1, q2])
 
     # Make neural net
     utf = tf.reshape(tf.convert_to_tensor(u0), (u0.shape[0], u0.shape[1]))
-    net = nn.NeuralNet_LorenzStepper(parameters=parameters, irk=IRK, neurons=q.shape[0], activation=activation)
-    net.compile(optimizer=optimizer, loss=net.loss)
+    net = nn.NeuralNet_LorenzStepper(
+        parameters=parameters, irk=IRK, neurons=q.shape[0], activation=activation
+    )
+    loss_fn = net.custom_loss
+    net.compile(
+        optimizer=optimizer, loss=lambda y_true, y_pred: loss_fn(y_true, y_pred)
+    )
 
     # Fit model
-    net.fit(utf, utf, epochs=epochs, shuffle=True)  # , callbacks=[early_stop])  # , batch_size=nodes)
+    net.fit(
+        utf, utf, epochs=epochs, shuffle=True
+    )  # , callbacks=[early_stop])  # , batch_size=nodes)
 
     out = net.predict(utf)  # , batch_size=nodes)
 
@@ -61,27 +68,39 @@ for idx in range(steps):
 
     # Use output as guess for Newton solver
     nt = 2
-    qs = np.zeros((3, order+1, nt))
-    for i in range(order+1):
+    qs = np.zeros((3, order + 1, nt))
+    for i in range(order + 1):
         qs[:, i, 0] = q
 
     for i in range(1, nt):
         # Newton iteration for rhs evaluations
-        k_vec = newton.newton_irk(q, dt=dt, irk=IRK, threshold=1.0e-10, max_iterations=300, guess=out[0, :, :])
+        k_vec = newton.newton_irk(
+            q, dt=dt, irk=IRK, threshold=1.0e-10, max_iterations=300, guess=out[0, :, :]
+        )
         # GL stages
-        qs[:, :-1, i] = q[:, None] + dt * np.transpose(np.tensordot(IRK.rk_matrix, k_vec,
-                                                                    axes=([1], [0])), axes=([1, 0]))
+        qs[:, :-1, i] = q[:, None] + dt * np.transpose(
+            np.tensordot(IRK.rk_matrix, k_vec, axes=([1], [0])), axes=([1, 0])
+        )
         # Update
-        q += 0.5 * dt * np.tensordot(IRK.weights, k_vec, axes=([0], [0]))  # 0.5 * dt * (k1 + k2)
+        q += (
+            0.5 * dt * np.tensordot(IRK.weights, k_vec, axes=([0], [0]))
+        )  # 0.5 * dt * (k1 + k2)
         qs[:, -1, i] = q
 
     q_loop[:, :, idx] = qs[:, :, -1]
 
 fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
-ax.set_title('Lorenz system implicit RK advance, dt=%.3e' % dt + ', err threshold 1.0e-10')
+ax = fig.add_subplot(projection="3d")
+ax.set_title(
+    "Lorenz system implicit RK advance, dt=%.3e" % dt + ", err threshold 1.0e-10"
+)
 for i in range(steps):
-    ax.scatter(q_loop[0, :, i], q_loop[1, :, i], q_loop[2, :, i], label='stages of time-step ' + str(i))
+    ax.scatter(
+        q_loop[0, :, i],
+        q_loop[1, :, i],
+        q_loop[2, :, i],
+        label="stages of time-step " + str(i),
+    )
 # ax.scatter(out[:, 0, :].flatten(), out[:, 1, :].flatten(), out[:, 2, :].flatten(), label='predicted rk stages')
 # ax.scatter(qs[0, :, :].flatten(), qs[1, :, :].flatten(), qs[2, :, :].flatten(), label='newton iterated rk stages')
 # plt.legend(loc='best')
@@ -89,20 +108,23 @@ for i in range(steps):
 #     ax.plot(qs[0, :, i], qs[1, :, i], qs[2, :, i], 'o--')
 # print(qs)
 plt.show()
-print('show plz')
+print("show plz")
 quit()
 
+
 # Part Two: Advection-Diffusion with net:
-
-
 def solution_dirichlet(x, t, a):
     # Problem to solve... first mode of dirichlet linear advection-diffusion
-    return np.exp(a * 0.5 * (x - a * 0.5 * t)) * np.sin(np.pi * x) * np.exp(-(np.pi ** 2.0) * t)
+    return (
+        np.exp(a * 0.5 * (x - a * 0.5 * t))
+        * np.sin(np.pi * x)
+        * np.exp(-(np.pi**2.0) * t)
+    )
 
 
 def solution_periodic(x, t, a):
     # Problem to solve... periodic traveling mode of linear advection-diffusion
-    return np.sin(2.0 * np.pi * (x - a * t)) * np.exp(-(2.0 * np.pi) ** 2.0 * t)
+    return np.sin(2.0 * np.pi * (x - a * t)) * np.exp(-((2.0 * np.pi) ** 2.0) * t)
 
 
 # Net parameters
@@ -110,8 +132,8 @@ dt = 0.05
 alpha = 1.0
 parameters = [dt, alpha]
 # neurons = nodes
-activation = 'tanh'
-optimizer = 'adam'
+activation = "tanh"
+optimizer = "adam"
 epochs = 1500
 # early_stop = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=20)
 
@@ -125,8 +147,8 @@ u0 = solution_periodic(x0, 0, alpha)
 
 # Look at it...
 plt.figure()
-plt.plot(x0, u0, 'o--', label='Initial condition')
-plt.legend(loc='best')
+plt.plot(x0, u0, "o--", label="Initial condition")
+plt.legend(loc="best")
 plt.grid(True)
 plt.show()
 
@@ -138,9 +160,17 @@ boundary = np.array([lb, rb])
 # Make neural net
 xtf = tf.reshape(tf.convert_to_tensor(x0), (nodes, 1))
 utf = tf.reshape(tf.convert_to_tensor(u0), (nodes, 1))
-net = nn.NeuralNet_AdvectionDiffusion(x=x0, u=u0, bc=boundary, parameters=parameters,
-                                      irk=IRK, neurons=nodes, activation=activation)
-net.compile(optimizer=optimizer, loss=net.loss_with_bc)
+net = nn.NeuralNet_AdvectionDiffusion(
+    x=x0,
+    u=u0,
+    bc=boundary,
+    parameters=parameters,
+    irk=IRK,
+    neurons=nodes,
+    activation=activation,
+)
+loss_fn_ad = net.loss_with_bc
+net.compile(optimizer=optimizer, loss=lambda y_true, y_pred: loss_fn_ad(y_true, y_pred))
 
 # Fit model
 net.fit(xtf, utf, epochs=epochs, shuffle=True)
@@ -153,19 +183,19 @@ u0_pred = out[0, :, :] - dt * tf.matmul(rhs, IRK.rk_matrix_tf32)
 u1_true = solution_periodic(x0, dt, alpha)
 
 plt.figure()
-plt.plot(x0, out[0, :, -1], '--', label='Net solution')
-plt.plot(x0, u0, label='Initial condition')
-plt.plot(x0, u1_true, label='True solution')
+plt.plot(x0, out[0, :, -1], "--", label="Net solution")
+plt.plot(x0, u0, label="Initial condition")
+plt.plot(x0, u1_true, label="True solution")
 for i in range(IRK.order):
-    plt.plot(x0, out[0, :, i], '--', label='stage ' + str(i))
-plt.title('Next stage prediction: solution')
-plt.legend(loc='best')
+    plt.plot(x0, out[0, :, i], "--", label="stage " + str(i))
+plt.title("Next stage prediction: solution")
+plt.legend(loc="best")
 plt.grid(True)
 
 plt.figure()
-plt.plot(x0, u0_pred[:, :], '--', label='u0 prediction')
-plt.plot(x0, u0, 'o--', label='u0')
-plt.legend(loc='best')
+plt.plot(x0, u0_pred[:, :], "--", label="u0 prediction")
+plt.plot(x0, u0, "o--", label="u0")
+plt.legend(loc="best")
 plt.grid(True)
 
 plt.show()

@@ -1,11 +1,10 @@
+import irk_coefficients as irk
 import matplotlib.pyplot as plt
+import neural_net as nn
+import newton as newton
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-
-import irk_coefficients as irk
-import neural_net as nn
-import newton as newton
 import x_grid as grid
 
 keras.backend.clear_session()

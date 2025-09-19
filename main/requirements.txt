@@ -2,3 +2,6 @@ numpy
 scipy
 tensorflow
 matplotlib
+pytest
+black 
+isort

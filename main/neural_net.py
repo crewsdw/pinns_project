@@ -139,7 +139,14 @@ class NeuralNet_AdvectionDiffusion(tf.keras.Model):
         return mean_sqr_error + boundary1 + boundary2 + boundary3
 
     def get_config(self):
-        pass
+        config = super().get_config()
+        config.update({
+            'dt': self.dt,
+            'alpha': self.alpha,
+            'neurons': self.neurons,
+            'activation': self.activation,
+        })
+        return config
 
 
 class NeuralNet_LorenzStepper(tf.keras.Model):
@@ -179,7 +186,6 @@ class NeuralNet_LorenzStepper(tf.keras.Model):
                     kernel_initializer=initializer,
                     bias_initializer="zeros",
                 ),
-                # tf.keras.layers.Dense(self.neurons, activation=self.activation),
                 tf.keras.layers.Dense(
                     self.neurons,
                     activation=self.activation,
@@ -224,4 +230,13 @@ class NeuralNet_LorenzStepper(tf.keras.Model):
         return mean_sqr_error
 
     def get_config(self):
-        pass
+        config = super().get_config()
+        config.update({
+            'dt': self.dt,
+            'sigma': self.sigma,
+            'beta': self.beta,
+            'rho': self.rho,
+            'neurons': self.neurons,
+            'activation': self.activation,
+        })
+        return config
